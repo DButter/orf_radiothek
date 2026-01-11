@@ -144,6 +144,10 @@ class ORFRadiothekProvider(MusicProvider):
         if provider_item_id not in self.STATIONS:
             raise MediaNotFoundError(f"Radio station {provider_item_id} not found")
         
+        # Safely check for stations key
+        if not api_ref or 'stations' not in api_ref:
+            raise MediaNotFoundError(f"API reference not available")
+        
         if provider_item_id not in api_ref['stations']:
             raise MediaNotFoundError(f"Stream URL not found for {provider_item_id}")
         
@@ -194,17 +198,17 @@ class ORFRadiothekProvider(MusicProvider):
 
     async def _get_api_reference(self):
         """Get API reference data."""
-        if not self._api_reference:
+        if self._api_reference is None:
+            # Initialize with empty fallback first
+            self._api_reference = {'stations': {}}
             try:
                 async with self.mass.http_session.get(self.API_REF) as resp:
                     if resp.status == 200:
                         self._api_reference = await resp.json()
                     else:
                         self.logger.error(f"Failed to get API reference: {resp.status}")
-                        self._api_reference = {'stations': {}}
             except Exception as e:
                 self.logger.exception(f"Failed to get API reference: {e}")
-                self._api_reference = {'stations': {}}
         
         return self._api_reference
 
