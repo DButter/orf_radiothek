@@ -30,6 +30,8 @@ class ORFRadiothekProvider(MusicProvider):
     API_REF = "https://orf.at/app-infos/sound/web/1.0/bundle.json?_o=sound.orf.at"
     STAPLE_URL = "/radiothek/stapled.json?_o=radiothek.orf.at"
     SEARCH_URL = "/radiothek/api/search"
+    # Note: Search is currently limited to matching station names against search queries.
+    # Future enhancements could include searching for specific broadcasts or podcasts.
     
     STATIONS = {
         'oe1': 'Ö1',
@@ -145,8 +147,11 @@ class ORFRadiothekProvider(MusicProvider):
             raise MediaNotFoundError(f"Radio station {provider_item_id} not found")
         
         # Safely check for stations key
-        if not api_ref or 'stations' not in api_ref:
-            raise MediaNotFoundError(f"API reference not available")
+        if not api_ref:
+            raise MediaNotFoundError(f"API reference could not be loaded for {provider_item_id}")
+        
+        if 'stations' not in api_ref:
+            raise MediaNotFoundError(f"API reference missing stations data for {provider_item_id}")
         
         if provider_item_id not in api_ref['stations']:
             raise MediaNotFoundError(f"Stream URL not found for {provider_item_id}")
@@ -197,9 +202,13 @@ class ORFRadiothekProvider(MusicProvider):
             return None
 
     async def _get_api_reference(self):
-        """Get API reference data."""
+        """Get API reference data.
+        
+        Returns a dict with at minimum an empty 'stations' dict to prevent KeyErrors.
+        This ensures the provider can gracefully handle API failures.
+        """
         if self._api_reference is None:
-            # Initialize with empty fallback first
+            # Initialize with empty fallback structure to prevent KeyErrors downstream
             self._api_reference = {'stations': {}}
             try:
                 async with self.mass.http_session.get(self.API_REF) as resp:
